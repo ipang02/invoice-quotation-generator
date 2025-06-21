@@ -1,552 +1,505 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invoice & Quotation Generator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        @media print {
-            body { 
-                -webkit-print-color-adjust: exact; 
-                print-color-adjust: exact; 
-            }
-            .no-print { display: none !important; }
-            .print-only { display: block !important; }
-        }
-        .print-only { display: none; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice & Quotation Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #printArea, #printArea * {
+        visibility: visible;
+      }
+      #printArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+      }
+    }
+    .error-message {
+      background-color: #fee;
+      border: 1px solid #fcc;
+      color: #c33;
+      padding: 10px;
+      border-radius: 4px;
+      margin: 10px 0;
+    }
+    .loading {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+  </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <div class="container mx-auto px-4 py-8 max-w-4xl">
-        <!-- Header Controls -->
-        <div class="bg-white rounded-lg shadow-sm p-6 mb-6 no-print">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <h1 class="text-2xl font-bold text-gray-800">Invoice & Quotation Generator</h1>
-                
-                <!-- Mode Toggle -->
-                <div class="flex items-center space-x-3">
-                    <span class="text-sm font-medium text-gray-700">Mode:</span>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="modeToggle" class="sr-only peer">
-                        <div class="w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
-                        <span class="ml-3 text-sm font-medium text-gray-700" id="modeLabel">Invoice</span>
-                    </label>
-                </div>
-            </div>
-            
-            <!-- Action Buttons -->
-            <div class="flex flex-wrap gap-3 mt-4">
-                <button onclick="saveDocument()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                    💾 Save Document
-                </button>
-                <button onclick="loadDocument()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                    📂 Load Document
-                </button>
-                <button onclick="generatePDF()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                    📄 Generate PDF
-                </button>
-                <button onclick="window.print()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                    🖨️ Print
-                </button>
-            </div>
-        </div>
+<body class="bg-gray-100 p-6">
+  <!-- Error Display -->
+  <div id="errorContainer" class="max-w-3xl mx-auto mb-4" style="display: none;">
+    <div id="errorMessage" class="error-message"></div>
+  </div>
 
-        <!-- Document Form -->
-        <div id="documentForm" class="bg-white rounded-lg shadow-sm overflow-hidden">
-            <!-- Document Header -->
-            <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
-                <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
-                    <div>
-                        <h2 id="documentTitle" class="text-3xl font-bold">INVOICE</h2>
-                        <p class="text-blue-100 mt-1">Professional Business Document</p>
-                    </div>
-                    <div class="text-right">
-                        <div class="bg-white/20 rounded-lg p-3">
-                            <label class="block text-sm font-medium text-blue-100 mb-1" id="documentNumberLabel">Invoice Number</label>
-                            <input type="text" id="documentNumber" class="bg-white/90 text-gray-800 px-3 py-2 rounded border-0 w-full text-center font-semibold" value="INV-001">
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="p-6">
-                <!-- Business Information -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-800 mb-4 border-b-2 border-blue-100 pb-2">From (Your Business)</h3>
-                        
-                        <!-- Logo Upload -->
-                        <div class="mb-4 no-print">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Business Logo</label>
-                            <input type="file" id="logoUpload" accept="image/*" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                        </div>
-                        
-                        <div id="logoDisplay" class="mb-4 hidden">
-                            <img id="logoImage" class="h-16 w-auto object-contain">
-                        </div>
-
-                        <div class="space-y-3">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Business Name</label>
-                                <input type="text" id="businessName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Your Business Name">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Registration No. (Optional)</label>
-                                <input type="text" id="registrationNo" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Company Registration Number">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                                <textarea id="businessAddress" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Business Address"></textarea>
-                            </div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                                    <input type="text" id="businessPhone" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="+60 12-345 6789">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                                    <input type="email" id="businessEmail" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="business@email.com">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-800 mb-4 border-b-2 border-blue-100 pb-2">To (Client)</h3>
-                        <div class="space-y-3">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Client Name</label>
-                                <input type="text" id="clientName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Client Name">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Client Address</label>
-                                <textarea id="clientAddress" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Client Address"></textarea>
-                            </div>
-                            
-                            <!-- Dates -->
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                                    <input type="date" id="documentDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1" id="dueDateLabel">Due Date</label>
-                                    <input type="date" id="dueDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Items Table -->
-                <div class="mb-8">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold text-gray-800">Items</h3>
-                        <button onclick="addItem()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors no-print">
-                            + Add Item
-                        </button>
-                    </div>
-
-                    <div class="overflow-x-auto">
-                        <table class="w-full border-collapse border border-gray-300">
-                            <thead>
-                                <tr class="bg-gray-50">
-                                    <th class="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">Description</th>
-                                    <th class="border border-gray-300 px-4 py-3 text-center text-sm font-semibold text-gray-700 w-24">Qty</th>
-                                    <th class="border border-gray-300 px-4 py-3 text-right text-sm font-semibold text-gray-700 w-32">Unit Price (RM)</th>
-                                    <th class="border border-gray-300 px-4 py-3 text-right text-sm font-semibold text-gray-700 w-32">Total (RM)</th>
-                                    <th class="border border-gray-300 px-4 py-3 text-center text-sm font-semibold text-gray-700 w-16 no-print">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="itemsTable">
-                                <!-- Items will be added here dynamically -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Totals Section -->
-                <div class="flex flex-col lg:flex-row gap-8">
-                    <div class="flex-1">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Notes / Terms</h3>
-                        <textarea id="notes" rows="5" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Payment terms, notes, or additional information..."></textarea>
-                    </div>
-
-                    <div class="lg:w-80">
-                        <div class="bg-gray-50 rounded-lg p-6">
-                            <div class="space-y-3">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-gray-700">Subtotal:</span>
-                                    <span class="font-semibold" id="subtotal">RM 0.00</span>
-                                </div>
-                                
-                                <div class="flex justify-between items-center">
-                                    <div class="flex items-center space-x-2">
-                                        <input type="checkbox" id="sstToggle" class="rounded">
-                                        <label for="sstToggle" class="text-gray-700">SST (6%):</label>
-                                    </div>
-                                    <span class="font-semibold" id="sstAmount">RM 0.00</span>
-                                </div>
-                                
-                                <hr class="border-gray-300">
-                                
-                                <div class="flex justify-between items-center text-lg">
-                                    <span class="font-bold text-gray-800">Grand Total:</span>
-                                    <span class="font-bold text-blue-600" id="grandTotal">RM 0.00</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <!-- Main Invoice Area -->
+  <div id="printArea" class="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-md text-sm">
+    <div class="flex justify-between items-center mb-6 border-b pb-4">
+      <div>
+        <h1 id="docTitle" class="text-2xl font-bold text-gray-800 uppercase tracking-wide">Invoice</h1>
+        <p class="text-gray-600" id="docNumberDisplay">#INV-000</p>
+      </div>
+      <div class="text-right text-gray-600">
+        <p id="docDateDisplay">Date: Not Set</p>
+        <p id="dueDateDisplay">Due Date: Not Set</p>
+      </div>
     </div>
 
-    <script>
-        // Global variables
-        let documentCounter = {
-            invoice: 1,
-            quotation: 1
+    <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div>
+        <h2 class="font-semibold text-gray-700 mb-1">From:</h2>
+        <p id="bizNameDisplay" class="text-gray-800 font-medium">Business Name</p>
+        <p id="bizRegDisplay">Registration No.</p>
+        <p id="bizAddressDisplay">Business Address</p>
+        <p id="bizPhoneDisplay">Phone</p>
+        <p id="bizEmailDisplay">Email</p>
+      </div>
+      <div>
+        <h2 class="font-semibold text-gray-700 mb-1">To:</h2>
+        <p id="clientNameDisplay" class="text-gray-800 font-medium">Client Name</p>
+        <p id="clientAddressDisplay">Client Address</p>
+      </div>
+    </div>
+
+    <table class="w-full mb-6 border border-gray-300">
+      <thead class="bg-gray-200">
+        <tr>
+          <th class="p-2 text-left border border-gray-300">Description</th>
+          <th class="p-2 text-right border border-gray-300">Qty</th>
+          <th class="p-2 text-right border border-gray-300">Unit Price (RM)</th>
+          <th class="p-2 text-right border border-gray-300">Total (RM)</th>
+        </tr>
+      </thead>
+      <tbody id="displayItemTable">
+        <tr>
+          <td class="p-2 border border-gray-300 text-gray-500" colspan="4">
+            No items found. Please add items using the form.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="flex justify-end">
+      <table class="text-right w-full sm:w-1/2">
+        <tr>
+          <td class="p-1 text-gray-600">Subtotal:</td>
+          <td class="p-1 font-medium" id="subtotalDisplay">RM 0.00</td>
+        </tr>
+        <tr>
+          <td class="p-1 text-gray-600">SST (6%):</td>
+          <td class="p-1 font-medium" id="taxDisplay">RM 0.00</td>
+        </tr>
+        <tr class="text-lg font-bold border-t">
+          <td class="p-1">Total:</td>
+          <td class="p-1" id="totalDisplay">RM 0.00</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="mt-6">
+      <h2 class="font-semibold text-gray-700 mb-1">Notes</h2>
+      <p id="notesDisplay" class="text-gray-600 whitespace-pre-line">No additional notes.</p>
+    </div>
+  </div>
+
+  <!-- Control Panel -->
+  <div class="max-w-3xl mx-auto mt-10 bg-white p-6 rounded-lg shadow-md">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Document Type</label>
+        <select id="docType" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          <option value="Invoice">Invoice</option>
+          <option value="Quotation">Quotation</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Document Number</label>
+        <input type="text" id="docNumber" placeholder="e.g., INV-001" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+        <input type="date" id="docDate" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
+        <input type="date" id="dueDate" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div>
+        <h3 class="text-lg font-semibold text-gray-800 mb-3">Business Information</h3>
+        <div class="space-y-3">
+          <input type="text" id="bizName" placeholder="Business Name" class="w-full border border-gray-300 rounded-md p-2">
+          <input type="text" id="bizReg" placeholder="Registration Number" class="w-full border border-gray-300 rounded-md p-2">
+          <textarea id="bizAddress" placeholder="Business Address" rows="2" class="w-full border border-gray-300 rounded-md p-2"></textarea>
+          <input type="tel" id="bizPhone" placeholder="Phone Number" class="w-full border border-gray-300 rounded-md p-2">
+          <input type="email" id="bizEmail" placeholder="Email Address" class="w-full border border-gray-300 rounded-md p-2">
+        </div>
+      </div>
+      <div>
+        <h3 class="text-lg font-semibold text-gray-800 mb-3">Client Information</h3>
+        <div class="space-y-3">
+          <input type="text" id="clientName" placeholder="Client Name" class="w-full border border-gray-300 rounded-md p-2">
+          <textarea id="clientAddress" placeholder="Client Address" rows="4" class="w-full border border-gray-300 rounded-md p-2"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-3">Items</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+        <input type="text" id="itemDesc" placeholder="Description" class="border border-gray-300 rounded-md p-2">
+        <input type="number" id="itemQty" placeholder="Quantity" min="0" step="0.01" class="border border-gray-300 rounded-md p-2">
+        <input type="number" id="itemPrice" placeholder="Unit Price" min="0" step="0.01" class="border border-gray-300 rounded-md p-2">
+        <button onclick="addItem()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors">Add Item</button>
+      </div>
+      <div id="itemsList" class="space-y-2"></div>
+    </div>
+
+    <div class="mb-6">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+      <textarea id="notes" placeholder="Additional notes..." rows="3" class="w-full border border-gray-300 rounded-md p-2"></textarea>
+    </div>
+
+    <div class="flex flex-wrap gap-3">
+      <button onclick="updatePreview()" class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors">Update Preview</button>
+      <button onclick="generatePDF()" id="pdfBtn" class="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 transition-colors">Download PDF</button>
+      <button onclick="saveData()" class="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 transition-colors">Save Data</button>
+      <button onclick="loadData()" class="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 transition-colors">Load Saved Data</button>
+      <button onclick="clearAll()" class="bg-orange-600 text-white px-6 py-2 rounded-md hover:bg-orange-700 transition-colors">Clear All</button>
+    </div>
+  </div>
+
+  <script>
+    // Global variables
+    let items = [];
+    let currentData = null;
+
+    // Initialize with current date
+    document.addEventListener('DOMContentLoaded', function() {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('docDate').value = today;
+      
+      // Set due date to 30 days from now
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 30);
+      document.getElementById('dueDate').value = dueDate.toISOString().split('T')[0];
+      
+      // Try to load data
+      loadData();
+    });
+
+    function showError(message) {
+      const container = document.getElementById('errorContainer');
+      const messageEl = document.getElementById('errorMessage');
+      messageEl.textContent = message;
+      container.style.display = 'block';
+      setTimeout(() => {
+        container.style.display = 'none';
+      }, 5000);
+    }
+
+    function validateInputs() {
+      const requiredFields = ['docNumber', 'bizName', 'clientName'];
+      for (let fieldId of requiredFields) {
+        const field = document.getElementById(fieldId);
+        if (!field.value.trim()) {
+          showError(`Please fill in the ${fieldId.replace(/([A-Z])/g, ' $1').toLowerCase()}`);
+          field.focus();
+          return false;
+        }
+      }
+      
+      if (items.length === 0) {
+        showError('Please add at least one item');
+        return false;
+      }
+      
+      return true;
+    }
+
+    function formatCurrency(amount) {
+      if (isNaN(amount)) return 'RM 0.00';
+      return `RM ${parseFloat(amount).toFixed(2)}`;
+    }
+
+    function addItem() {
+      const desc = document.getElementById('itemDesc').value.trim();
+      const qty = parseFloat(document.getElementById('itemQty').value) || 0;
+      const price = parseFloat(document.getElementById('itemPrice').value) || 0;
+
+      if (!desc) {
+        showError('Please enter item description');
+        return;
+      }
+      
+      if (qty <= 0) {
+        showError('Quantity must be greater than 0');
+        return;
+      }
+      
+      if (price < 0) {
+        showError('Price cannot be negative');
+        return;
+      }
+
+      const item = { desc, qty, price };
+      items.push(item);
+      
+      // Clear inputs
+      document.getElementById('itemDesc').value = '';
+      document.getElementById('itemQty').value = '';
+      document.getElementById('itemPrice').value = '';
+      
+      updateItemsList();
+      updatePreview();
+    }
+
+    function removeItem(index) {
+      if (index >= 0 && index < items.length) {
+        items.splice(index, 1);
+        updateItemsList();
+        updatePreview();
+      }
+    }
+
+    function updateItemsList() {
+      const container = document.getElementById('itemsList');
+      container.innerHTML = '';
+      
+      items.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'flex justify-between items-center bg-gray-50 p-3 rounded-md';
+        div.innerHTML = `
+          <span>${item.desc} - Qty: ${item.qty} × ${formatCurrency(item.price)} = ${formatCurrency(item.qty * item.price)}</span>
+          <button onclick="removeItem(${index})" class="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600">Remove</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function updatePreview() {
+      try {
+        const docType = document.getElementById('docType').value;
+        const docNumber = document.getElementById('docNumber').value || 'Not Set';
+        const docDate = document.getElementById('docDate').value || 'Not Set';
+        const dueDate = document.getElementById('dueDate').value || 'Not Set';
+
+        // Update document header
+        document.getElementById('docTitle').textContent = docType;
+        document.getElementById('docNumberDisplay').textContent = `#${docNumber}`;
+        document.getElementById('docDateDisplay').textContent = `Date: ${docDate}`;
+        document.getElementById('dueDateDisplay').textContent = `${docType === 'Invoice' ? 'Due Date' : 'Valid Until'}: ${dueDate}`;
+
+        // Update business info
+        document.getElementById('bizNameDisplay').textContent = document.getElementById('bizName').value || 'Business Name';
+        document.getElementById('bizRegDisplay').textContent = document.getElementById('bizReg').value || 'Registration No.';
+        document.getElementById('bizAddressDisplay').textContent = document.getElementById('bizAddress').value || 'Business Address';
+        document.getElementById('bizPhoneDisplay').textContent = document.getElementById('bizPhone').value || 'Phone';
+        document.getElementById('bizEmailDisplay').textContent = document.getElementById('bizEmail').value || 'Email';
+
+        // Update client info
+        document.getElementById('clientNameDisplay').textContent = document.getElementById('clientName').value || 'Client Name';
+        document.getElementById('clientAddressDisplay').textContent = document.getElementById('clientAddress').value || 'Client Address';
+
+        // Update notes
+        document.getElementById('notesDisplay').textContent = document.getElementById('notes').value || 'No additional notes.';
+
+        // Update items table
+        updateItemsTable();
+        
+        // Store current data
+        currentData = {
+          docType, docNumber, docDate, dueDate,
+          bizName: document.getElementById('bizName').value,
+          bizReg: document.getElementById('bizReg').value,
+          bizAddress: document.getElementById('bizAddress').value,
+          bizPhone: document.getElementById('bizPhone').value,
+          bizEmail: document.getElementById('bizEmail').value,
+          clientName: document.getElementById('clientName').value,
+          clientAddress: document.getElementById('clientAddress').value,
+          notes: document.getElementById('notes').value,
+          items: [...items]
         };
-        let currentMode = 'invoice';
+        
+      } catch (error) {
+        showError('Error updating preview: ' + error.message);
+      }
+    }
 
-        // Initialize application
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeApp();
+    function updateItemsTable() {
+      const tableBody = document.getElementById('displayItemTable');
+      tableBody.innerHTML = '';
+
+      if (items.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="p-2 border border-gray-300 text-gray-500" colspan="4">
+            No items found. Please add items using the form.
+          </td>
+        `;
+        tableBody.appendChild(row);
+        
+        // Reset totals
+        document.getElementById('subtotalDisplay').textContent = 'RM 0.00';
+        document.getElementById('taxDisplay').textContent = 'RM 0.00';
+        document.getElementById('totalDisplay').textContent = 'RM 0.00';
+        return;
+      }
+
+      let subtotal = 0;
+      items.forEach(item => {
+        const qty = parseFloat(item.qty) || 0;
+        const price = parseFloat(item.price) || 0;
+        const total = qty * price;
+        subtotal += total;
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="p-2 border border-gray-300">${item.desc}</td>
+          <td class="p-2 border border-gray-300 text-right">${qty}</td>
+          <td class="p-2 border border-gray-300 text-right">${price.toFixed(2)}</td>
+          <td class="p-2 border border-gray-300 text-right">${total.toFixed(2)}</td>
+        `;
+        tableBody.appendChild(row);
+      });
+
+      const tax = subtotal * 0.06;
+      const total = subtotal + tax;
+      
+      document.getElementById('subtotalDisplay').textContent = formatCurrency(subtotal);
+      document.getElementById('taxDisplay').textContent = formatCurrency(tax);
+      document.getElementById('totalDisplay').textContent = formatCurrency(total);
+    }
+
+    function saveData() {
+      try {
+        updatePreview();
+        if (currentData) {
+          // Since localStorage is not available in Claude.ai artifacts, 
+          // we'll simulate saving by showing a message
+          alert('Data would be saved to localStorage in a real environment. In this demo, the data is temporarily stored in memory.');
+        }
+      } catch (error) {
+        showError('Error saving data: ' + error.message);
+      }
+    }
+
+    function loadData() {
+      try {
+        // Since localStorage is not available, we'll just update the preview
+        // In a real environment, this would load from localStorage
+        updatePreview();
+      } catch (error) {
+        showError('Error loading data: ' + error.message);
+      }
+    }
+
+    function clearAll() {
+      if (confirm('Are you sure you want to clear all data?')) {
+        // Clear form inputs
+        document.getElementById('docNumber').value = '';
+        document.getElementById('bizName').value = '';
+        document.getElementById('bizReg').value = '';
+        document.getElementById('bizAddress').value = '';
+        document.getElementById('bizPhone').value = '';
+        document.getElementById('bizEmail').value = '';
+        document.getElementById('clientName').value = '';
+        document.getElementById('clientAddress').value = '';
+        document.getElementById('notes').value = '';
+        
+        // Clear items
+        items = [];
+        updateItemsList();
+        updatePreview();
+      }
+    }
+
+    function generatePDF() {
+      if (!validateInputs()) {
+        return;
+      }
+
+      const pdfBtn = document.getElementById('pdfBtn');
+      const printArea = document.getElementById('printArea');
+      
+      try {
+        pdfBtn.textContent = 'Generating...';
+        pdfBtn.disabled = true;
+        printArea.classList.add('loading');
+
+        html2canvas(printArea, { 
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff'
+        }).then(canvas => {
+          const imgData = canvas.toDataURL('image/png');
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF('p', 'pt', 'a4');
+          
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+          
+          if (pdfHeight > pdf.internal.pageSize.getHeight()) {
+            // Handle multiple pages if needed
+            const totalPages = Math.ceil(pdfHeight / pdf.internal.pageSize.getHeight());
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            
+            for (let i = 0; i < totalPages; i++) {
+              if (i > 0) pdf.addPage();
+              const yOffset = -(i * pageHeight);
+              pdf.addImage(imgData, 'PNG', 0, yOffset, pdfWidth, pdfHeight);
+            }
+          } else {
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+          }
+          
+          const filename = `${document.getElementById('docTitle').textContent}-${document.getElementById('docNumber').value || 'Document'}.pdf`;
+          pdf.save(filename);
+          
+        }).catch(error => {
+          showError('Error generating PDF: ' + error.message);
+        }).finally(() => {
+          pdfBtn.textContent = 'Download PDF';
+          pdfBtn.disabled = false;
+          printArea.classList.remove('loading');
         });
+        
+      } catch (error) {
+        showError('Error generating PDF: ' + error.message);
+        pdfBtn.textContent = 'Download PDF';
+        pdfBtn.disabled = false;
+        printArea.classList.remove('loading');
+      }
+    }
 
-        function initializeApp() {
-            // Set today's date
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('documentDate').value = today;
-            
-            // Set due date to 30 days from today
-            const dueDate = new Date();
-            dueDate.setDate(dueDate.getDate() + 30);
-            document.getElementById('dueDate').value = dueDate.toISOString().split('T')[0];
+    // Event listeners
+    document.getElementById('docType').addEventListener('change', updatePreview);
+    
+    // Auto-update preview when typing in key fields
+    ['docNumber', 'docDate', 'dueDate', 'bizName', 'clientName'].forEach(id => {
+      document.getElementById(id).addEventListener('input', updatePreview);
+    });
 
-            // Load saved business info
-            loadBusinessInfo();
-            
-            // Load counters
-            loadCounters();
-            
-            // Add event listeners
-            document.getElementById('modeToggle').addEventListener('change', toggleMode);
-            document.getElementById('sstToggle').addEventListener('change', calculateTotals);
-            document.getElementById('logoUpload').addEventListener('change', handleLogoUpload);
-            
-            // Add first item
-            addItem();
-            
-            // Auto-save business info
-            setupAutoSave();
+    // Enter key handling for item inputs
+    ['itemDesc', 'itemQty', 'itemPrice'].forEach(id => {
+      document.getElementById(id).addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          addItem();
         }
-
-        function toggleMode() {
-            const toggle = document.getElementById('modeToggle');
-            const isQuotation = toggle.checked;
-            currentMode = isQuotation ? 'quotation' : 'invoice';
-            
-            // Update UI elements
-            document.getElementById('modeLabel').textContent = isQuotation ? 'Quotation' : 'Invoice';
-            document.getElementById('documentTitle').textContent = isQuotation ? 'QUOTATION' : 'INVOICE';
-            document.getElementById('documentNumberLabel').textContent = isQuotation ? 'Quotation Number' : 'Invoice Number';
-            document.getElementById('dueDateLabel').textContent = isQuotation ? 'Valid Until' : 'Due Date';
-            
-            // Update document number
-            updateDocumentNumber();
-        }
-
-        function updateDocumentNumber() {
-            const prefix = currentMode === 'quotation' ? 'QUO' : 'INV';
-            const number = String(documentCounter[currentMode]).padStart(3, '0');
-            document.getElementById('documentNumber').value = `${prefix}-${number}`;
-        }
-
-        function addItem() {
-            const table = document.getElementById('itemsTable');
-            const row = table.insertRow();
-            
-            row.innerHTML = `
-                <td class="border border-gray-300 px-4 py-2">
-                    <input type="text" class="w-full border-0 focus:ring-0 focus:outline-none bg-transparent" placeholder="Item description">
-                </td>
-                <td class="border border-gray-300 px-4 py-2">
-                    <input type="number" class="w-full border-0 focus:ring-0 focus:outline-none bg-transparent text-center" value="1" min="0" step="1" onchange="calculateTotals()">
-                </td>
-                <td class="border border-gray-300 px-4 py-2">
-                    <input type="number" class="w-full border-0 focus:ring-0 focus:outline-none bg-transparent text-right" value="0.00" min="0" step="0.01" onchange="calculateTotals()">
-                </td>
-                <td class="border border-gray-300 px-4 py-2 text-right font-semibold">RM 0.00</td>
-                <td class="border border-gray-300 px-4 py-2 text-center no-print">
-                    <button onclick="removeItem(this)" class="text-red-600 hover:text-red-800 font-bold">×</button>
-                </td>
-            `;
-            
-            calculateTotals();
-        }
-
-        function removeItem(button) {
-            const row = button.closest('tr');
-            row.remove();
-            calculateTotals();
-        }
-
-        function calculateTotals() {
-            const table = document.getElementById('itemsTable');
-            const rows = table.querySelectorAll('tr');
-            let subtotal = 0;
-
-            rows.forEach(row => {
-                const qtyInput = row.querySelector('input[type="number"]:nth-of-type(1)');
-                const priceInput = row.querySelector('input[type="number"]:nth-of-type(2)');
-                const totalCell = row.querySelector('td:nth-of-type(4)');
-
-                if (qtyInput && priceInput && totalCell) {
-                    const qty = parseFloat(qtyInput.value) || 0;
-                    const price = parseFloat(priceInput.value) || 0;
-                    const lineTotal = qty * price;
-                    
-                    totalCell.textContent = formatCurrency(lineTotal);
-                    subtotal += lineTotal;
-                }
-            });
-
-            const sstEnabled = document.getElementById('sstToggle').checked;
-            const sstAmount = sstEnabled ? subtotal * 0.06 : 0;
-            const grandTotal = subtotal + sstAmount;
-
-            document.getElementById('subtotal').textContent = formatCurrency(subtotal);
-            document.getElementById('sstAmount').textContent = formatCurrency(sstAmount);
-            document.getElementById('grandTotal').textContent = formatCurrency(grandTotal);
-        }
-
-        function formatCurrency(amount) {
-            return `RM ${amount.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        }
-
-        function handleLogoUpload(event) {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const logoDisplay = document.getElementById('logoDisplay');
-                    const logoImage = document.getElementById('logoImage');
-                    
-                    logoImage.src = e.target.result;
-                    logoDisplay.classList.remove('hidden');
-                    
-                    // Save logo to localStorage
-                    localStorage.setItem('businessLogo', e.target.result);
-                };
-                reader.readAsDataURL(file);
-            }
-        }
-
-        function saveBusinessInfo() {
-            const businessInfo = {
-                name: document.getElementById('businessName').value,
-                registrationNo: document.getElementById('registrationNo').value,
-                address: document.getElementById('businessAddress').value,
-                phone: document.getElementById('businessPhone').value,
-                email: document.getElementById('businessEmail').value
-            };
-            localStorage.setItem('businessInfo', JSON.stringify(businessInfo));
-        }
-
-        function loadBusinessInfo() {
-            const saved = localStorage.getItem('businessInfo');
-            if (saved) {
-                const info = JSON.parse(saved);
-                document.getElementById('businessName').value = info.name || '';
-                document.getElementById('registrationNo').value = info.registrationNo || '';
-                document.getElementById('businessAddress').value = info.address || '';
-                document.getElementById('businessPhone').value = info.phone || '';
-                document.getElementById('businessEmail').value = info.email || '';
-            }
-            
-            // Load logo
-            const savedLogo = localStorage.getItem('businessLogo');
-            if (savedLogo) {
-                const logoDisplay = document.getElementById('logoDisplay');
-                const logoImage = document.getElementById('logoImage');
-                
-                logoImage.src = savedLogo;
-                logoDisplay.classList.remove('hidden');
-            }
-        }
-
-        function setupAutoSave() {
-            // Auto-save business info when fields change
-            const businessFields = ['businessName', 'registrationNo', 'businessAddress', 'businessPhone', 'businessEmail'];
-            businessFields.forEach(fieldId => {
-                document.getElementById(fieldId).addEventListener('blur', saveBusinessInfo);
-            });
-        }
-
-        function saveCounters() {
-            localStorage.setItem('documentCounters', JSON.stringify(documentCounter));
-        }
-
-        function loadCounters() {
-            const saved = localStorage.getItem('documentCounters');
-            if (saved) {
-                documentCounter = JSON.parse(saved);
-            }
-            updateDocumentNumber();
-        }
-
-        function saveDocument() {
-            const documentData = {
-                mode: currentMode,
-                number: document.getElementById('documentNumber').value,
-                date: document.getElementById('documentDate').value,
-                dueDate: document.getElementById('dueDate').value,
-                clientName: document.getElementById('clientName').value,
-                clientAddress: document.getElementById('clientAddress').value,
-                notes: document.getElementById('notes').value,
-                sstEnabled: document.getElementById('sstToggle').checked,
-                items: []
-            };
-
-            // Save items
-            const table = document.getElementById('itemsTable');
-            const rows = table.querySelectorAll('tr');
-            rows.forEach(row => {
-                const description = row.querySelector('input[type="text"]').value;
-                const qty = row.querySelector('input[type="number"]:nth-of-type(1)').value;
-                const price = row.querySelector('input[type="number"]:nth-of-type(2)').value;
-                
-                documentData.items.push({ description, qty, price });
-            });
-
-            // Save to localStorage with timestamp
-            const timestamp = new Date().getTime();
-            const key = `document_${timestamp}`;
-            localStorage.setItem(key, JSON.stringify(documentData));
-            
-            // Increment counter and save
-            documentCounter[currentMode]++;
-            saveCounters();
-            updateDocumentNumber();
-
-            alert('Document saved successfully!');
-        }
-
-        function loadDocument() {
-            // Get all saved documents
-            const documents = [];
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key.startsWith('document_')) {
-                    const data = JSON.parse(localStorage.getItem(key));
-                    documents.push({ key, data, timestamp: parseInt(key.split('_')[1]) });
-                }
-            }
-
-            if (documents.length === 0) {
-                alert('No saved documents found.');
-                return;
-            }
-
-            // Sort by timestamp (newest first)
-            documents.sort((a, b) => b.timestamp - a.timestamp);
-
-            // Create selection dialog
-            const selection = documents.map((doc, index) => 
-                `${index + 1}. ${doc.data.mode.toUpperCase()} ${doc.data.number} - ${doc.data.clientName || 'No Client'} (${new Date(doc.timestamp).toLocaleDateString()})`
-            ).join('\n');
-
-            const choice = prompt(`Select document to load:\n\n${selection}\n\nEnter number (1-${documents.length}):`);
-            const index = parseInt(choice) - 1;
-
-            if (index >= 0 && index < documents.length) {
-                const doc = documents[index].data;
-                
-                // Load document data
-                document.getElementById('modeToggle').checked = doc.mode === 'quotation';
-                toggleMode();
-                
-                document.getElementById('documentNumber').value = doc.number;
-                document.getElementById('documentDate').value = doc.date;
-                document.getElementById('dueDate').value = doc.dueDate;
-                document.getElementById('clientName').value = doc.clientName;
-                document.getElementById('clientAddress').value = doc.clientAddress;
-                document.getElementById('notes').value = doc.notes;
-                document.getElementById('sstToggle').checked = doc.sstEnabled;
-
-                // Clear and load items
-                document.getElementById('itemsTable').innerHTML = '';
-                doc.items.forEach(item => {
-                    addItem();
-                    const lastRow = document.getElementById('itemsTable').lastElementChild;
-                    lastRow.querySelector('input[type="text"]').value = item.description;
-                    lastRow.querySelector('input[type="number"]:nth-of-type(1)').value = item.qty;
-                    lastRow.querySelector('input[type="number"]:nth-of-type(2)').value = item.price;
-                });
-
-                calculateTotals();
-                alert('Document loaded successfully!');
-            }
-        }
-
-        async function generatePDF() {
-            const { jsPDF } = window.jspdf;
-            
-            // Hide no-print elements
-            const noPrintElements = document.querySelectorAll('.no-print');
-            noPrintElements.forEach(el => el.style.display = 'none');
-            
-            try {
-                // Create canvas from the document
-                const element = document.getElementById('documentForm');
-                const canvas = await html2canvas(element, {
-                    scale: 2,
-                    useCORS: true,
-                    allowTaint: true
-                });
-                
-                const imgData = canvas.toDataURL('image/png');
-                
-                // Create PDF
-                const pdf = new jsPDF('p', 'mm', 'a4');
-                const imgWidth = 210; // A4 width in mm
-                const pageHeight = 295; // A4 height in mm
-                const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                let heightLeft = imgHeight;
-                
-                let position = 0;
-                
-                // Add first page
-                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
-                
-                // Add additional pages if needed
-                while (heightLeft >= 0) {
-                    position = heightLeft - imgHeight;
-                    pdf.addPage();
-                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                    heightLeft -= pageHeight;
-                }
-                
-                // Download PDF
-                const fileName = `${document.getElementById('documentNumber').value}_${document.getElementById('clientName').value || 'Document'}.pdf`;
-                pdf.save(fileName);
-                
-            } catch (error) {
-                console.error('Error generating PDF:', error);
-                alert('Error generating PDF. Please try again.');
-            } finally {
-                // Show no-print elements again
-                noPrintElements.forEach(el => el.style.display = '');
-            }
-        }
-    </script>
+      });
+    });
+  </script>
 </body>
 </html>
